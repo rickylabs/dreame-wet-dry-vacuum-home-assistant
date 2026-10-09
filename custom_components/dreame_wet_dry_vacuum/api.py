@@ -320,7 +320,12 @@ class DreameAPI:
         result = await self._authed_post(url, payload)
         if result.get("code") != 0:
             return False
-        results = (result.get("data") or {}).get("result")
+        data = result.get("data")
+        if data is None:
+            # Seen live on an H14 Pro (upstream PR #7): an accepted write can
+            # come back with code 0 and "data": null.
+            return True
+        results = data.get("result") if isinstance(data, dict) else None
         return (
             isinstance(results, list)
             and len(results) == 1
@@ -353,7 +358,7 @@ class DreameAPI:
         }
 
         result = await self._authed_post(url, payload)
-        return result.get("data", {}).get("code", -1) == 0
+        return (result.get("data") or {}).get("code", -1) == 0
 
     async def discover_properties(
         self, device_id: str, siid_range: range = range(1, 11), piid_range: range = range(1, 21)
