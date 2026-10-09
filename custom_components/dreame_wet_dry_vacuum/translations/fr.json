@@ -56,7 +56,7 @@
         "name": "Brosse rouleau avant — heures restantes"
       },
       "detergent_fav": {
-        "name": "Préférence détergent",
+        "name": "Mode de dosage du détergent",
         "state": {
           "smart": "Dosage intelligent",
           "powerful": "Détachage puissant"
