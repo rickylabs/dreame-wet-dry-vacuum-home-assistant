@@ -307,7 +307,9 @@ KNOWN_SELECT_PROPS: dict[tuple[int, int], dict] = {
         "key": "power_wheel",
         "name": "Force de traction",
         "icon": "mdi:car-traction-control",
-        "options": {0: "light", 1: "balanced", 2: "strong"},
+        # Vérifié sur H14 Pro (app) : 0 = équilibré, 1 = léger, 2 = fort.
+        # Ordre du dict = ordre affiché (léger, équilibré, fort).
+        "options": {1: "light", 0: "balanced", 2: "strong"},
         "optimistic": True,
     },
 }
