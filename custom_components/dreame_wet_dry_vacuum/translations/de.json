@@ -56,7 +56,11 @@
         "name": "Vordere Walzenbürste – verbleibende Stunden"
       },
       "detergent_fav": {
-        "name": "Reinigungsmittel-Dosiermodus"
+        "name": "Reinigungsmittel-Dosiermodus",
+        "state": {
+          "smart": "Intelligente Dosierung",
+          "powerful": "Kraftvolle Fleckenentfernung"
+        }
       },
       "dustbag_left": {
         "name": "Staubbeutel – verbleibende Minuten"
@@ -202,7 +206,12 @@
     },
     "select": {
       "power_wheel": {
-        "name": "Eigenantriebskraft"
+        "name": "Eigenantriebskraft",
+        "state": {
+          "light": "Leicht",
+          "balanced": "Ausgeglichen",
+          "strong": "Stark"
+        }
       }
     },
     "button": {
