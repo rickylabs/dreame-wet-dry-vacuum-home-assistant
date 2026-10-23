@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: "0 0 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   hacs:
     name: HACS
@@ -31,14 +34,17 @@ jobs:
       - uses: astral-sh/ruff-action@v3
 
   tests:
-    name: Unit tests
+    name: Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install test dependencies
-        run: pip install pytest aiohttp pycryptodome "paho-mqtt>=2.0"
+        run: pip install pytest-homeassistant-custom-component pytest-timeout pycryptodome "paho-mqtt>=2.0"
       - name: Run tests
-        run: pytest -q
+        run: pytest -q -p no:cacheprovider

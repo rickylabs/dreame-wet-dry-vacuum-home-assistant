@@ -92,9 +92,11 @@ class DreameMqttClient:
         self._client = client
         client.connect_async(self._host, self._port, keepalive=60)
         client.loop_start()
-        _LOGGER.debug("Dreame MQTT client started for %s", self._did)
+        # The device id stays out of the log: users paste logs into issues.
+        _LOGGER.debug("Dreame MQTT client started")
 
     def stop(self) -> None:
+        self.connected = False
         if self._client:
             try:
                 self._client.disconnect()
@@ -109,7 +111,8 @@ class DreameMqttClient:
             return
         self.connected = True
         client.subscribe(self.topic)
-        _LOGGER.info("Dreame MQTT connected, subscribed %s", self.topic)
+        # The topic holds the device id and account uid: keep it out of the log.
+        _LOGGER.info("Dreame MQTT connected")
 
     def _on_disconnect(
         self, client, userdata, disconnect_flags, reason_code, properties

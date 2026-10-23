@@ -5,7 +5,6 @@ MANUFACTURER = "Dreame"
 MODEL = "H14 Pro"
 H14_PRO_MODEL = "dreame.hold.w2306e"
 H15_MIX_MODEL = "dreame.hold.w2506"
-SUPPORTED_MODELS = {H14_PRO_MODEL, H15_MIX_MODEL}
 H15_MIX_DIRTY_TANK_FULL_BIT = 4096  # Observed on this model on 2026-10-12.
 
 # These readings were observed on an H15 Mix on 2026-10-12. H14 controls and
@@ -39,6 +38,45 @@ H15_MIX_STATUS_DE = {
     29: "Staubsaugen pausiert", 46: "Teppichfleckenreinigung",
     48: "Teppichfleckenreinigung pausiert",
 }
+
+# H15 Pro Heat (dreame.hold.w2449e): work-state names for 1.28, decoded from
+# the Dreamehome app plugin and checked against a live H15 Pro Heat by Matan
+# Mesika (@matanmesika, H15_MAPPING.md, 2026-10-07/08). In his captures 2.1
+# mirrored 1.28, and 4.2 bit 4096 was set while the app showed "used water
+# tank full". Not tested on a device by this fork.
+H15_PRO_HEAT_MODEL = "dreame.hold.w2449e"
+H15_PRO_HEAT_STATUS_EN = {
+    1: "Power on", 2: "Power off", 3: "Standby", 4: "Charging",
+    5: "Self-cleaning", 6: "Self-drying", 7: "Sleeping", 8: "Convenient",
+    9: "Adding clean water", 10: "Washing paused", 11: "Cleaning paused",
+    12: "Drying paused", 13: "OTA upgrading", 14: "Voice upgrading",
+    15: "Charging complete", 16: "Auto cleaning", 17: "Degerming",
+    18: "Water suction", 19: "Quiet cleaning", 20: "Quick cleaning",
+    21: "Strong cleaning", 22: "Personalized cleaning", 23: "Fast drying",
+    24: "Faster drying", 25: "Quiet drying", 26: "Fast self-cleaning",
+    27: "Deep self-cleaning", 28: "Smart self-cleaning",
+    29: "Convenient paused", 30: "Fast self-cleaning paused",
+    31: "Deep self-cleaning paused", 32: "Fast self-cleaning drying",
+    33: "Deep self-cleaning drying", 34: "Smart self-cleaning drying",
+    35: "Retry drying", 36: "Retry self-cleaning",
+    37: "Smart self-cleaning paused", 40: "Power mode",
+    41: "Hot water cleaning", 42: "Hot water self-cleaning",
+    43: "Hot water self-cleaning paused",
+}
+
+# Codes 1-15 mean the same thing on every wet & dry model seen so far (H14 Pro,
+# H15 Mix, H15 Pro Heat). A model without its own table only gets these.
+GENERIC_STATUS_EN = {
+    1: "Cleaning", 2: "Offline", 3: "Standby", 4: "Charging",
+    5: "Self-cleaning", 6: "Drying", 7: "Sleeping", 8: "Vacuuming",
+    9: "Add clean water", 10: "Cleaning paused", 11: "Self-cleaning paused",
+    12: "Drying paused", 13: "Updating", 14: "Updating voice package",
+    15: "Charged",
+}
+
+# Wet & dry vacuums share this model prefix; robot vacuums and mowers on the
+# same Dreame account do not, so the config flow only offers these.
+WET_DRY_MODEL_PREFIX = "dreame.hold."
 
 # API — one shard per region: https://{region}.iot.dreame.tech:13267
 # Verified resolvable 2026-09: eu, cn, us, sg, ru, kr.

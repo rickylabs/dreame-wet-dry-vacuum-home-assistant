@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Dreame Wet & Dry Vacuum",
-        "description": "Verbinde deinen Dreame-Nass-Trockensauger (entwickelt und getestet mit dem H14 Pro) mit Home Assistant. Verwende dazu die Zugangsdaten deiner Dreamehome-App.",
+        "description": "Verbinde deinen Dreame-Nass-Trockensauger mit den Zugangsdaten deiner Dreamehome-App. Getestet: H14 Pro und H15 Mix. Andere Modelle werden nur lesend eingebunden.",
         "data": {
           "username": "E-Mail",
           "password": "Passwort",

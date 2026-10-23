@@ -40,6 +40,23 @@ REGION_URLS = {
 
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
 
+# Login statuses that mean "wrong account or password". Anything else (5xx,
+# rate limits...) is a cloud problem and must not start a reauth flow.
+_AUTH_REJECTED = frozenset({400, 401, 403})
+# Log in again this long before the token runs out (Dreame gives 7200 s).
+_TOKEN_MARGIN = 300
+_DEFAULT_TOKEN_LIFE = 7200
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    """The value if it is a dict, else an empty dict (cloud replies vary)."""
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value: Any) -> list[Any]:
+    """The value if it is a list, else an empty list."""
+    return value if isinstance(value, list) else []
+
 
 def _md5_password(password: str) -> str:
     return hashlib.md5((password + DREAME_PASSWORD_SALT).encode()).hexdigest()
@@ -101,6 +118,7 @@ class DreameAPI:
         self._region = region
         self._base_url = REGION_URLS.get(region, EU_BASE_URL)
         self._access_token: str | None = None
+        self._token_expires_at: float = 0.0
         self._uid: str | None = None
         self._session = session
         self._owns_session = session is None
@@ -170,19 +188,29 @@ class DreameAPI:
             async with session.post(
                 url, headers=headers, data=data, timeout=REQUEST_TIMEOUT
             ) as resp:
+                # The reply body is never put in an error: it can hold
+                # account details, and errors end up in logs.
+                if resp.status in _AUTH_REJECTED:
+                    raise DreameAuthError(f"Login rejected ({resp.status})")
                 if resp.status != 200:
-                    text = await resp.text()
-                    raise DreameAuthError(f"Login failed ({resp.status}): {text[:200]}")
+                    raise DreameAPIError(f"Login failed ({resp.status})")
                 result = await resp.json(content_type=None)
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             raise DreameAPIError(f"Login request failed: {err}") from err
 
-        if "access_token" not in result:
-            raise DreameAuthError(f"No access_token in response: {result}")
+        result = _as_dict(result)
+        token = result.get("access_token")
+        if not token:
+            raise DreameAuthError("No access token in login reply")
 
-        self._access_token = result["access_token"]
+        self._access_token = token
         self._uid = result.get("uid")
-        _LOGGER.debug("Dreame login successful, uid=%s", self._uid)
+        try:
+            life = int(result.get("expires_in") or _DEFAULT_TOKEN_LIFE)
+        except (TypeError, ValueError):
+            life = _DEFAULT_TOKEN_LIFE
+        self._token_expires_at = time.monotonic() + max(60, life - _TOKEN_MARGIN)
+        _LOGGER.debug("Dreame login successful")
 
     async def _authed_post(self, url: str, payload: dict[str, Any]) -> dict[str, Any]:
         """POST with bearer auth; re-login and retry exactly once on 401.
@@ -204,13 +232,13 @@ class DreameAPI:
                         await self.login()
                         continue
                     if resp.status != 200:
-                        text = await resp.text()
-                        raise DreameAPIError(
-                            f"Request failed ({resp.status}): {text[:200]}"
-                        )
-                    return await resp.json(content_type=None)
+                        raise DreameAPIError(f"Request failed ({resp.status})")
+                    result = await resp.json(content_type=None)
             except (aiohttp.ClientError, TimeoutError, ValueError) as err:
                 raise DreameAPIError(f"Request failed: {err}") from err
+            if not isinstance(result, dict):
+                raise DreameAPIError("Unexpected reply from the Dreame cloud")
+            return result
         raise DreameAPIError("Still unauthorized after re-login")
 
     async def get_devices(self) -> list[dict[str, Any]]:
@@ -226,12 +254,12 @@ class DreameAPI:
             self._base_url + ENDPOINTS["device_list"], payload
         )
 
-        data = result.get("data") or {}
+        data = _as_dict(result.get("data"))
         # Dreame nests the list under data.page.records
-        records = (data.get("page") or {}).get("records") or []
+        records = _as_list(_as_dict(data.get("page")).get("records"))
         if not records:
-            records = data.get("records") or []
-        return records
+            records = _as_list(data.get("records"))
+        return [record for record in records if isinstance(record, dict)]
 
     async def get_device_snapshot(self, device_id: str) -> dict[str, Any]:
         """
@@ -247,7 +275,7 @@ class DreameAPI:
                     "status": d.get("latestStatus"),
                     "online": d.get("online"),
                     "model": d.get("model"),
-                    "name": d.get("deviceInfo", {}).get("displayName")
+                    "name": _as_dict(d.get("deviceInfo")).get("displayName")
                     or d.get("customName")
                     or d.get("model"),
                     "firmware": d.get("ver"),
@@ -272,7 +300,9 @@ class DreameAPI:
         )
 
         out: dict[str, Any] = {}
-        for item in result.get("data") or []:
+        for item in _as_list(result.get("data")):
+            if not isinstance(item, dict):
+                continue
             key = item.get("key")
             if key is None or "value" not in item:
                 continue
@@ -308,8 +338,8 @@ class DreameAPI:
         }
 
         result = await self._authed_post(url, payload)
-        data = result.get("data") or {}
-        return data.get("result") or []
+        data = _as_dict(result.get("data"))
+        return [item for item in _as_list(data.get("result")) if isinstance(item, dict)]
 
     async def set_property(
         self, device_id: str, siid: int, piid: int, value: Any
@@ -371,7 +401,7 @@ class DreameAPI:
         }
 
         result = await self._authed_post(url, payload)
-        return (result.get("data") or {}).get("code", -1) == 0
+        return _as_dict(result.get("data")).get("code", -1) == 0
 
     async def discover_properties(
         self, device_id: str, siid_range: range = range(1, 11), piid_range: range = range(1, 21)
@@ -391,7 +421,7 @@ class DreameAPI:
             try:
                 data = await self.get_properties(device_id, chunk)
                 for item in data:
-                    if item.get("code", -1) == 0:
+                    if item.get("code", -1) == 0 and "siid" in item and "piid" in item:
                         key = (item["siid"], item["piid"])
                         results[key] = item.get("value")
             except DreameAPIError as err:
@@ -399,5 +429,7 @@ class DreameAPI:
         return results
 
     async def _ensure_logged_in(self) -> None:
-        if self._access_token is None:
+        # Log in again shortly before the token runs out, so the next MQTT
+        # reconnect gets a token that still works.
+        if self._access_token is None or time.monotonic() >= self._token_expires_at:
             await self.login()

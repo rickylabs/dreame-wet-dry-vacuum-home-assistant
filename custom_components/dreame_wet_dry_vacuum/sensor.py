@@ -18,18 +18,17 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from . import DreameWetDryConfigEntry
 from .const import (
     CONSUMABLE_SENSORS,
-    DEVICE_STATUS,
     ERROR_DECODE,
-    H15_MIX_MODEL,
-    H15_MIX_READABLE_PROPS,
-    H15_MIX_STATUS_DE,
-    H15_MIX_STATUS_EN,
     KNOWN_MQTT_PROPS,
     WARN_DECODE,
     decode_field_alerts,
 )
 from .coordinator import DreameWetDryCoordinator
 from .entity import build_device_info
+from .models import describe_status
+
+# Work mode (1.28) uses the status names on models whose profile says so.
+_WORK_MODE = (1, 28)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +51,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: DreameWetDryCoordinator = entry.runtime_data
-    h15_mix = coordinator.device_info_raw.get("model") == H15_MIX_MODEL
+    readable = coordinator.profile.readable_props
     added: set[tuple[int, int]] = set()
 
     @callback
@@ -62,8 +61,10 @@ async def async_setup_entry(
             # Only create sensors for *recognised* properties. Props handled by
             # another platform (switch/number/select/button) or not yet identified
             # are intentionally not turned into generic "Propriété X.Y" sensors.
+            # The model profile narrows that further to what its maker
+            # actually reports (None = every known property).
             if key in added or key not in KNOWN_MQTT_PROPS or (
-                h15_mix and key not in H15_MIX_READABLE_PROPS
+                readable is not None and key not in readable
             ):
                 continue
             added.add(key)
@@ -79,7 +80,7 @@ async def async_setup_entry(
     async_add_entities(
         DreameWetDryConsumableSensor(coordinator, meta)
         for meta in CONSUMABLE_SENSORS
-        if not h15_mix or tuple(map(int, meta["left"].split("."))) in H15_MIX_READABLE_PROPS
+        if readable is None or tuple(map(int, meta["left"].split("."))) in readable
     )
 
 
@@ -94,7 +95,9 @@ class DreameWetDrySensor(CoordinatorEntity[DreameWetDryCoordinator], SensorEntit
         self._data_key = f"{key[0]}.{key[1]}"
         meta = KNOWN_MQTT_PROPS.get(key, {})
         self._meta = meta
-        self._is_enum = meta.get("enum", False)
+        self._is_enum = meta.get("enum", False) or (
+            key == _WORK_MODE and coordinator.profile.work_mode_labels
+        )
         self._list_scalar = meta.get("list_scalar", False)
         self._is_timestamp = meta.get("timestamp", False)
         self._is_bitmask = meta.get("bitmask", False)
@@ -147,17 +150,13 @@ class DreameWetDrySensor(CoordinatorEntity[DreameWetDryCoordinator], SensorEntit
             except (ValueError, TypeError):
                 return None
         if self._is_enum:
-            try:
-                if self.coordinator.device_info_raw.get("model") == H15_MIX_MODEL:
-                    states = (
-                        H15_MIX_STATUS_DE
-                        if self.coordinator.hass.config.language.startswith("de")
-                        else H15_MIX_STATUS_EN
-                    )
-                    return states.get(int(raw), str(raw))
-                return DEVICE_STATUS.get(int(raw), str(raw))
-            except (ValueError, TypeError):
-                return str(raw)
+            # Unknown codes read "Status N" and are logged once (models.py).
+            return describe_status(
+                self.coordinator.profile,
+                self.coordinator.model,
+                raw,
+                self.coordinator.hass.config.language,
+            )
         # Lists we don't reduce: present as string to stay valid
         if isinstance(raw, list):
             return ", ".join(str(x) for x in raw)
@@ -195,6 +194,8 @@ class DreameWetDryConsumableSensor(CoordinatorEntity[DreameWetDryCoordinator], S
         self._left_key = meta["left"]
         self._max_key = meta["max"]
         self._full_life_min = meta["full_life_min"]
+        # The 60 h fallback was measured on the H14 Pro and H15 Mix only.
+        self._use_fallback = coordinator.profile.consumable_fallback
         self._attr_unique_id = f"{coordinator.device_id}_consumable_{meta['key']}"
         self._attr_translation_key = f"consumable_{meta['key']}"
         self._attr_icon = meta.get("icon")
@@ -222,13 +223,15 @@ class DreameWetDryConsumableSensor(CoordinatorEntity[DreameWetDryCoordinator], S
         except (ValueError, TypeError):
             full = -1
         from_device = full > 0
+        attrs: dict[str, Any] = {"minutes_remaining": left}
         if not from_device:
+            if not self._use_fallback:
+                # No full life from the device and none known for this model:
+                # a percentage would be a guess.
+                return attrs
             full = self._full_life_min
-        attrs: dict[str, Any] = {
-            "minutes_remaining": left,
-            "full_life_hours": round(full / 60, 1),
-            "full_life_source": "device" if from_device else "défaut (60 h)",
-        }
+        attrs["full_life_hours"] = round(full / 60, 1)
+        attrs["full_life_source"] = "device" if from_device else "défaut (60 h)"
         if full > 0:
             attrs["percent_remaining"] = max(0, min(100, round(left / full * 100)))
         return attrs

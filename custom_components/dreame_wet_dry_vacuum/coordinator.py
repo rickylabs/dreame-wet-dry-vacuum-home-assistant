@@ -22,9 +22,9 @@ from .const import (
     KNOWN_SELECT_PROPS,
     KNOWN_SWITCH_PROPS,
     MQTT_ONLY_KEYS,
-    STATUS_GROUP,
 )
 from .dreame_mqtt import DreameMqttClient
+from .models import ModelProfile, get_profile, status_group
 
 # All "siid.piid" keys worth polling from the cloud status endpoint.
 # MQTT_ONLY_KEYS (fast-changing progress) are excluded: they're driven by the
@@ -62,7 +62,9 @@ class DreameWetDryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             _LOGGER,
             config_entry=entry,
-            name=f"{DOMAIN}_{device_id}",
+            # HA logs this name at debug level, so it holds the model id,
+            # never the device id.
+            name=f"{DOMAIN} {device_info.get('model') or 'unknown model'}",
             # No self-rescheduling interval: async_set_updated_data (fired on
             # every MQTT push) would postpone it indefinitely while the device
             # is active. The safety-net poll runs on an independent timer
@@ -72,6 +74,14 @@ class DreameWetDryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.api = api
         self.device_id = device_id
         self.device_info_raw = device_info
+        # The cloud device list is the source of truth; the stored model is
+        # only a fallback for an entry made before the list changed.
+        self.model: str = str(
+            device_info.get("model")
+            or (entry.data.get("device_model") if entry else None)
+            or ""
+        )
+        self.profile: ModelProfile = get_profile(self.model)
         # Latest cloud snapshot (online, battery, status…), refreshed each poll
         self.snapshot: dict[str, Any] = {}
         # Live property store keyed by (siid, piid)
@@ -124,7 +134,7 @@ class DreameWetDryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             uid=self.api.uid,
             access_token=self.api.access_token,
             device_id=self.device_id,
-            model=snap.get("model", ""),
+            model=self.model,
             bind_domain=bind,
             on_update=self._handle_mqtt_update,
             region=self.api.region,
@@ -165,9 +175,9 @@ class DreameWetDryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Flatten props + snapshot into a name->value dict for entities."""
         data: dict[str, Any] = {f"{s}.{p}": v for (s, p), v in self.props.items()}
         # status_group from the main status property (2.1) if present
-        status = self.props.get((2, 1))
-        if status is not None:
-            data["status_group"] = STATUS_GROUP.get(int(status), "unknown")
+        group = status_group(self.profile, self.props.get((2, 1)))
+        if group is not None:
+            data["status_group"] = group
         return data
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -189,20 +199,31 @@ class DreameWetDryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.props[(3, 1)] = snapshot["battery"]
             if snapshot.get("status") is not None:
                 self.props[(2, 1)] = snapshot["status"]
-            # Refresh MQTT credentials if the token rotated (it expires after 2 h)
-            if self.mqtt and self.api.access_token:
-                self.mqtt.update_token(self.api.access_token)
+
+        # Hand MQTT the current token even when the snapshot came back empty:
+        # the HTTP call above logs in again once the 2 h token runs out, and
+        # MQTT reconnects use whatever token it holds.
+        if self.mqtt and self.api.access_token:
+            self.mqtt.update_token(self.api.access_token)
 
         # Read cloud-cached property values (warn/error, consumables, settings…).
         # This is what makes alerts like "dirty tank full" reliable even when MQTT
         # missed the push (e.g. HA started after the event fired).
         try:
             values = await self.api.get_status_props(self.device_id, _POLL_KEYS)
-            for key, value in values.items():
-                s, _, p = key.partition(".")
-                self.props[(int(s), int(p))] = value
-        except (DreameAPIError, ValueError) as err:
+        except DreameAPIError as err:
             _LOGGER.debug("status_props poll failed (non-fatal): %s", err)
+            values = None
+        if not isinstance(values, dict):
+            values = {}
+        for key, value in values.items():
+            # Keys are "siid.piid"; skip anything else instead of dropping
+            # the whole reply.
+            s, _, p = str(key).partition(".")
+            try:
+                self.props[(int(s), int(p))] = value
+            except ValueError:
+                continue
 
         # Cached properties can retain the last active state after disconnect.
         if snapshot and snapshot.get("online") is False:

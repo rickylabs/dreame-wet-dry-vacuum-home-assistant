@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Aspirateur laveur Dreame",
-        "description": "Connectez votre Dreame H14 Pro ou H15 Mix à Home Assistant avec vos identifiants de l'application Dreame Home.",
+        "description": "Connectez votre aspirateur eau et poussière Dreame avec vos identifiants de l'application Dreamehome. Testés : H14 Pro et H15 Mix. Les autres modèles sont ajoutés en lecture seule.",
         "data": {
           "username": "Adresse e-mail",
           "password": "Mot de passe",

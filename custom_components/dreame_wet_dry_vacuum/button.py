@@ -7,7 +7,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import DreameWetDryConfigEntry
-from .const import H15_MIX_MODEL, KNOWN_BUTTON_PROPS
+from .const import KNOWN_BUTTON_PROPS
 from .entity import DreameWetDryEntity
 from .h15 import async_start_self_clean, dirty_tank_full
 
@@ -18,13 +18,17 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator = entry.runtime_data
-    buttons = KNOWN_BUTTON_PROPS.items()
-    if coordinator.device_info_raw.get("model") == H15_MIX_MODEL:
-        buttons = [(key, meta) for key, meta in buttons if key == (1, 1)]
+    # Only commands checked on this model; untested models get none.
     async_add_entities(
         DreameWetDryButton(coordinator, key, meta)
-        for key, meta in buttons
+        for key, meta in KNOWN_BUTTON_PROPS.items()
+        if key in coordinator.profile.button_keys
     )
+
+
+def _guarded_self_clean(coordinator) -> bool:
+    """H15 Mix: self-clean goes through the checked start sequence."""
+    return coordinator.profile.key == "h15_mix"
 
 
 class DreameWetDryButton(DreameWetDryEntity, ButtonEntity):
@@ -36,17 +40,19 @@ class DreameWetDryButton(DreameWetDryEntity, ButtonEntity):
 
     @property
     def available(self) -> bool:
-        if self.coordinator.device_info_raw.get("model") == H15_MIX_MODEL:
+        if not super().available:
+            return False
+        if _guarded_self_clean(self.coordinator):
             status = self.coordinator.props.get((2, 1))
             return (
                 bool(self.coordinator.snapshot.get("online"))
                 and status in (4, 15)
                 and not dirty_tank_full(self.coordinator)
             )
-        return super().available
+        return True
 
     async def async_press(self) -> None:
-        if self.coordinator.device_info_raw.get("model") == H15_MIX_MODEL:
+        if _guarded_self_clean(self.coordinator):
             try:
                 await async_start_self_clean(self.coordinator)
             except RuntimeError as err:

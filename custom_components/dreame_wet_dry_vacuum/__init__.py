@@ -8,26 +8,21 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_USERNAME,
     EVENT_HOMEASSISTANT_STOP,
-    Platform,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import DreameAPI, DreameAPIError, DreameAuthError
-from .const import CONF_DEVICE_ID, CONF_REGION, H15_MIX_MODEL
+from .const import CONF_DEVICE_ID, CONF_REGION
 from .coordinator import DreameWetDryCoordinator
+from .models import ALL_PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = [
-    Platform.SENSOR,
-    Platform.BINARY_SENSOR,
-    Platform.SWITCH,
-    Platform.NUMBER,
-    Platform.SELECT,
-    Platform.BUTTON,
-]
+# Every platform this integration has. A model only loads the ones its
+# profile lists (see models.py).
+PLATFORMS = list(ALL_PLATFORMS)
 
 type DreameWetDryConfigEntry = ConfigEntry[DreameWetDryCoordinator]
 
@@ -53,7 +48,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: DreameWetDryConfigEntry)
     device_info = next((d for d in devices if str(d.get("did")) == str(device_id)), {})
     if not device_info:
         raise ConfigEntryNotReady("Dreame device is missing from this account")
-    model = device_info.get("model") or entry.data.get("device_model")
 
     coordinator = DreameWetDryCoordinator(hass, entry, api, device_id, device_info)
 
@@ -65,28 +59,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: DreameWetDryConfigEntry)
 
     # Start the real-time MQTT feed. start() builds an SSL context (blocking
     # disk I/O), so keep it off the event loop.
-    await hass.async_add_executor_job(coordinator.start_mqtt)
+    # A failure here costs live updates only: the 5-minute poll keeps going.
+    try:
+        await hass.async_add_executor_job(coordinator.start_mqtt)
+    except (OSError, ValueError, RuntimeError) as err:
+        _LOGGER.warning(
+            "Dreame live updates are off (%s); polling every 5 minutes instead",
+            type(err).__name__,
+        )
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, coordinator.async_on_ha_stop)
     )
 
-    platforms = (
-        [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
-        if model == H15_MIX_MODEL else PLATFORMS
+    await hass.config_entries.async_forward_entry_setups(
+        entry, coordinator.profile.platforms
     )
-    await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DreameWetDryConfigEntry) -> bool:
     """Unload a config entry."""
-    model = entry.runtime_data.device_info_raw.get("model") or entry.data.get("device_model")
-    platforms = (
-        [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
-        if model == H15_MIX_MODEL else PLATFORMS
+    unloaded = await hass.config_entries.async_unload_platforms(
+        entry, entry.runtime_data.profile.platforms
     )
-    unloaded = await hass.config_entries.async_unload_platforms(entry, platforms)
     if unloaded:
         coordinator = entry.runtime_data
         coordinator.stopping = True

@@ -9,7 +9,13 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import DreameAPI, DreameAPIError, DreameAuthError
-from .const import CONF_DEVICE_ID, CONF_REGION, DOMAIN, REGIONS, SUPPORTED_MODELS
+from .const import (
+    CONF_DEVICE_ID,
+    CONF_REGION,
+    DOMAIN,
+    REGIONS,
+    WET_DRY_MODEL_PREFIX,
+)
 
 STEP_USER_SCHEMA = vol.Schema(
     {
@@ -61,7 +67,10 @@ class DreameWetDryConfigFlow(ConfigFlow, domain=DOMAIN):
                 await api.login()
                 self._devices = [
                     device for device in await api.get_devices()
-                    if device.get("model") in SUPPORTED_MODELS
+                    # Every wet & dry model id starts with this prefix; models
+                    # without a profile load read-only (see models.py).
+                    if str(device.get("model") or "").startswith(WET_DRY_MODEL_PREFIX)
+                    and device.get("did") not in (None, "")
                 ]
             except DreameAuthError:
                 errors["base"] = "invalid_auth"
