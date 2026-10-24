@@ -23,6 +23,7 @@ from .const import (
     H15_MIX_STATUS_DE,
     H15_MIX_STATUS_EN,
     H15_PRO_HEAT_MODEL,
+    H15_PRO_HEAT_MODEL_ALT,
     H15_PRO_HEAT_STATUS_EN,
     STATUS_GROUP,
 )
@@ -137,6 +138,7 @@ PROFILES: dict[str, ModelProfile] = {
     H14_PRO_MODEL: H14_PRO,
     H15_MIX_MODEL: H15_MIX,
     H15_PRO_HEAT_MODEL: H15_PRO_HEAT,
+    H15_PRO_HEAT_MODEL_ALT: H15_PRO_HEAT,
 }
 
 # Log each untested model and each unknown status code once per run.

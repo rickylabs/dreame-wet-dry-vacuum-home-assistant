@@ -15,7 +15,7 @@ This is a fork of [morcus/dreame-wet-dry-vacuum-home-assistant](https://github.c
 |---|---|---|---|
 | H14 Pro | `dreame.hold.w2306e` | Tested | Sensors, alerts, switches, numbers, selects, self-clean and self-dry buttons |
 | H15 Mix | `dreame.hold.w2506` | Tested by the author of upstream PR #8 | Sensors, alerts, Start self-cleaning button |
-| H15 Pro Heat | `dreame.hold.w2449e` | **Untested** (state codes from @matanmesika's captures) | Read-only: state, work mode, battery, brush and filter life |
+| H15 Pro Heat | `dreame.hold.w2449e`, `dreame.hold.w2449g` | **Untested** (state codes from @matanmesika's captures) | Read-only: state, work mode, battery, brush and filter life |
 | Any other `dreame.hold.*` | | **Untested** | Read-only: state, battery, work mode code |
 
 Untested models never get controls. Unknown state codes show as `Status <number>` instead of failing. The first time the integration sees an untested model or an unknown state code, it logs the model id and the code once (no account data).

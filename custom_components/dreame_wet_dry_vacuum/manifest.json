@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/rickylabs/dreame-wet-dry-vacuum-home-assistant/issues",
   "loggers": ["paho.mqtt"],
   "requirements": ["pycryptodome>=3.19.0", "paho-mqtt>=2.0.0"],
-  "version": "0.3.0"
+  "version": "0.3.1"
 }
