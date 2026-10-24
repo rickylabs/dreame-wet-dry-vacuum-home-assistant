@@ -9,6 +9,7 @@ from custom_components.dreame_wet_dry_vacuum.const import (
     H14_PRO_MODEL,
     H15_MIX_MODEL,
     H15_PRO_HEAT_MODEL,
+    H15_PRO_HEAT_MODEL_ALT,
 )
 from custom_components.dreame_wet_dry_vacuum.models import (
     GENERIC,
@@ -35,6 +36,7 @@ class TestProfiles:
             (H14_PRO_MODEL, H14_PRO),
             (H15_MIX_MODEL, H15_MIX),
             (H15_PRO_HEAT_MODEL, H15_PRO_HEAT),
+            (H15_PRO_HEAT_MODEL_ALT, H15_PRO_HEAT),
             (UNKNOWN_MODEL, GENERIC),
             ("", GENERIC),
             (None, GENERIC),

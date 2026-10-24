@@ -45,6 +45,10 @@ H15_MIX_STATUS_DE = {
 # mirrored 1.28, and 4.2 bit 4096 was set while the app showed "used water
 # tank full". Not tested on a device by this fork.
 H15_PRO_HEAT_MODEL = "dreame.hold.w2449e"
+# Second model id for the same device (vacuum.mindsolo.net lists it as H15
+# Pro Heat). Seen live 2026-10-24 on firmware 2.1.8_1047: 2.1 and 1.28 both
+# 7 (Sleeping), 3.1 battery 100.
+H15_PRO_HEAT_MODEL_ALT = "dreame.hold.w2449g"
 H15_PRO_HEAT_STATUS_EN = {
     1: "Power on", 2: "Power off", 3: "Standby", 4: "Charging",
     5: "Self-cleaning", 6: "Self-drying", 7: "Sleeping", 8: "Convenient",
