@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.dreame_wet_dry_vacuum.api import DreameAPIError, DreameAuthError
-from custom_components.dreame_wet_dry_vacuum.const import DOMAIN
+from custom_components.dreame_wet_dry_vacuum.const import DOMAIN, H14_DUAL_MODEL
 
 from .common import (
     DID,
@@ -80,6 +80,47 @@ async def test_unique_ids_keep_their_format(hass: HomeAssistant, mqtt_client) ->
         f"{DID}_consumable_front_brush",
     } <= unique_ids
     assert all(uid.startswith(f"{DID}_") for uid in unique_ids)
+
+
+async def test_h14_dual_loads_what_it_reports(
+    hass: HomeAssistant, mqtt_client, caplog
+) -> None:
+    caplog.set_level(logging.INFO, logger=OUR_LOGGER)
+    api = make_api(device_record(H14_DUAL_MODEL, latestStatus=7, battery=100))
+    # Values an H14 Dual returned on 2026-11-05 (firmware 2.1.8_1078).
+    api.get_status_props.return_value = {
+        "1.7": 1, "1.28": 7, "1.47": 1793864370, "1.49": 1, "1.53": 673,
+        "1.54": 68, "1.56": 3600, "1.64": 155, "1.67": 2, "1.68": 0,
+        "1.69": 0, "4.1": 0, "4.2": 4096, "4.3": 0, "4.5": [81], "4.6": 0,
+        "4.7": [3], "6.7": 2778, "7.7": 2778, "16.1": 3, "16.2": 3,
+        "16.6": 1, "17.8": 1, "19.3": 2924,
+    }
+    entry = await setup_entry(hass, api, H14_DUAL_MODEL)
+    assert entry.state is ConfigEntryState.LOADED
+
+    domains = {e.domain for e in _entries(hass, entry)}
+    assert domains == {"sensor", "binary_sensor"}
+    assert _state(hass, "sensor", "2.1").state == "Sleeping"
+    assert _state(hass, "sensor", "1.54").state == "68"
+    assert _state(hass, "sensor", "4.5").state == "81"
+    assert _state(hass, "binary_sensor", "dirty_tank_full").state == "on"
+    assert _state(hass, "sensor", "1.67").state == "smart"
+    # The app showed 673 minutes of cleaning for 1.53 = 673.
+    total = _state(hass, "sensor", "1.53")
+    assert total.attributes["unit_of_measurement"] == "min"
+    assert float(total.state) == 673
+    # The app showed 81 % filter and 77 % brush: a 60 h full life.
+    filter_state = _state(hass, "sensor", "consumable_filter")
+    assert filter_state.state == "48.7"
+    assert filter_state.attributes["percent_remaining"] == 81
+    brush = _state(hass, "sensor", "consumable_front_brush")
+    assert brush.attributes["percent_remaining"] == 77
+    # Properties it does not report get no entity.
+    unique_ids = {e.unique_id for e in _entries(hass, entry)}
+    assert f"{DID}_1.55" not in unique_ids
+    assert f"{DID}_21.7" not in unique_ids
+    # A tested model is not logged as untested.
+    assert not [m for m in _our_messages(caplog) if "not tested" in m]
 
 
 async def test_unknown_model_loads_read_only(

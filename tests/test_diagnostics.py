@@ -49,6 +49,8 @@ async def _diagnostics(hass: HomeAssistant):
         H15_PRO_HEAT_MODEL,
         latestStatus=42,
         network={"localip": LOCAL_IP, "ssid": SSID},
+        # The device list carries the MAC a second time, as a JSON string.
+        property=json.dumps({"mac": MAC}),
     )
     api = make_api(record)
     api.get_status_props.return_value = {"6.7": 1200}
@@ -71,6 +73,7 @@ async def test_identifiers_are_removed(hass: HomeAssistant, mqtt_client) -> None
     assert result["entry"]["data"]["password"] == REDACTED
     assert result["device"]["mac"] == REDACTED
     assert result["device"]["network"]["localip"] == REDACTED
+    assert result["device"]["property"] == REDACTED
 
 
 async def test_useful_values_are_kept(hass: HomeAssistant, mqtt_client) -> None:

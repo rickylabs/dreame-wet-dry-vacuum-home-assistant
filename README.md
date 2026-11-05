@@ -14,6 +14,7 @@ This is a fork of [morcus/dreame-wet-dry-vacuum-home-assistant](https://github.c
 | Model | Model id | Status | What you get |
 |---|---|---|---|
 | H14 Pro | `dreame.hold.w2306e` | Tested | Sensors, alerts, switches, numbers, selects, self-clean and self-dry buttons |
+| H14 Dual | `dreame.hold.w2318e` | Tested (reading only) | Read-only: state (English, Ukrainian), battery, totals and last clean, brush and filter life (hours and %), water level, suction mode, warn/error codes, dirty water tank alert |
 | H15 Mix | `dreame.hold.w2506` | Tested by the author of upstream PR #8 | Sensors, alerts, Start self-cleaning button |
 | H15 Pro Heat | `dreame.hold.w2449e`, `dreame.hold.w2449g` | **Untested** (state codes from @matanmesika's captures) | Read-only: state, work mode, battery, brush and filter life |
 | Any other `dreame.hold.*` | | **Untested** | Read-only: state, battery, work mode code |

@@ -112,8 +112,9 @@ class DreameWetDrySensor(CoordinatorEntity[DreameWetDryCoordinator], SensorEntit
             self._attr_device_class = dc
         if sc := _STATE_CLASSES.get(meta.get("state_class")):
             self._attr_state_class = sc
-        if meta.get("unit"):
-            self._attr_native_unit_of_measurement = meta["unit"]
+        unit = coordinator.profile.prop_units.get(key) or meta.get("unit")
+        if unit:
+            self._attr_native_unit_of_measurement = unit
         if self._options:
             self._attr_device_class = SensorDeviceClass.ENUM
             self._attr_options = list(self._options.values())

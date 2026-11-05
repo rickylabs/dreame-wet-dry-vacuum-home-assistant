@@ -68,8 +68,41 @@ H15_PRO_HEAT_STATUS_EN = {
     43: "Hot water self-cleaning paused",
 }
 
+# H14 Dual (dreame.hold.w2318e), seen live 2026-11-05 on firmware 2.1.8_1078.
+# Units and the 60 h consumable life were checked in the app (models.py).
+# The cloud reported 2.1 and 1.28 both 7 (Sleeping), 3.1 battery 100 and the
+# properties below; 2.1 codes 1-29 match the H14 Pro keyDefine one for one.
+H14_DUAL_MODEL = "dreame.hold.w2318e"
+H14_DUAL_READABLE_PROPS = {
+    (1, 28), (1, 47), (1, 49), (1, 53), (1, 54), (1, 56), (1, 64), (1, 67),
+    (1, 68), (1, 69), (2, 1), (3, 1), (4, 1), (4, 2), (4, 3), (4, 5), (4, 6),
+    (4, 7), (6, 7), (7, 7), (19, 3),
+}
+# State names for 2.1 from Dreame's keyDefine v23 for this model
+# (d41803ca..._dreame.hold.w2318e_iotKeyValue_translate_23.json). The Ukrainian
+# table there has an Italian "Disconnesso" for 2; "Офлайн" replaces it.
+H14_DUAL_STATUS_EN = {
+    **dict.fromkeys((1, 16, 17, 18, 19, 20, 21, 22), "Mopping"),
+    **dict.fromkeys((6, 23, 24, 25), "Drying"),
+    **dict.fromkeys((5, 26, 27, 28), "Self-cleaning"),
+    2: "Offline", 3: "Standby", 4: "Charging", 7: "Sleeping", 8: "Vacuuming",
+    9: "Adding clean water", 10: "Mopping paused", 11: "Self-cleaning paused",
+    12: "Drying paused", 13: "Updating", 14: "Updating voice package",
+    15: "Charged", 29: "Vacuuming paused",
+}
+H14_DUAL_STATUS_UK = {
+    **dict.fromkeys((1, 16, 17, 18, 19, 20, 21, 22), "Миття підлоги"),
+    **dict.fromkeys((6, 23, 24, 25), "Сушіння"),
+    **dict.fromkeys((5, 26, 27, 28), "Самоочищення"),
+    2: "Офлайн", 3: "Режим очікування", 4: "Зарядка", 7: "Режим сну",
+    8: "Прибирання пилососом", 9: "Додавання чистої води",
+    10: "Миття підлоги призупинено", 11: "Самоочищення призупинено",
+    12: "Сушіння призупинено", 13: "Оновлення", 14: "Оновлення голосового пакета",
+    15: "Зарядка завершена", 29: "Пилосос призупинено",
+}
+
 # Codes 1-15 mean the same thing on every wet & dry model seen so far (H14 Pro,
-# H15 Mix, H15 Pro Heat). A model without its own table only gets these.
+# H14 Dual, H15 Mix, H15 Pro Heat). A model without its own table only gets these.
 GENERIC_STATUS_EN = {
     1: "Cleaning", 2: "Offline", 3: "Standby", 4: "Charging",
     5: "Self-cleaning", 6: "Drying", 7: "Sleeping", 8: "Vacuuming",
