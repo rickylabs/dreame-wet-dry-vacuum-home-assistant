@@ -34,6 +34,8 @@ TO_REDACT = {
     "deviceId",
     "device_name",
     "mac",
+    # device/listV2 puts a JSON string here, e.g. '{"mac":"68:25:..."}'
+    "property",
     "sn",
     "serial",
     "serialNumber",

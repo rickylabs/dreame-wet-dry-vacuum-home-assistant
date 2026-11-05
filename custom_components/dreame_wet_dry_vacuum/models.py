@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from homeassistant.const import Platform
@@ -17,6 +17,10 @@ from homeassistant.const import Platform
 from .const import (
     DEVICE_STATUS,
     GENERIC_STATUS_EN,
+    H14_DUAL_MODEL,
+    H14_DUAL_READABLE_PROPS,
+    H14_DUAL_STATUS_EN,
+    H14_DUAL_STATUS_UK,
     H14_PRO_MODEL,
     H15_MIX_MODEL,
     H15_MIX_READABLE_PROPS,
@@ -65,6 +69,8 @@ class ModelProfile:
     status_groups: Mapping[int, str]
     # Assume a 60 h life when the device does not report the full life.
     consumable_fallback: bool
+    # Units that differ from KNOWN_MQTT_PROPS on this model.
+    prop_units: Mapping[tuple[int, int], str] = field(default_factory=dict)
 
 
 H14_PRO = ModelProfile(
@@ -80,6 +86,28 @@ H14_PRO = ModelProfile(
     work_mode_labels=False,
     status_groups=STATUS_GROUP,
     consumable_fallback=True,
+)
+
+# Read live from an H14 Dual (see const.py). Only reading was checked, so it
+# gets sensors and the dirty-tank alert (4.2 bit 4096, the same bit on the
+# H14 Pro, H15 Mix and H15 Pro Heat) and no controls. Checked against the
+# Dreamehome app by the owner on 2026-11-05: 1.53 = 673 was 673 minutes of
+# cleaning, 6.7 / 19.3 = 2778 / 2924 minutes were 77 % / 81 % (a 60 h life),
+# and 1.67 = 2 was smart detergent dosing.
+H14_DUAL = ModelProfile(
+    key="h14_dual",
+    name="H14 Dual",
+    tested=True,
+    platforms=READ_ONLY_PLATFORMS,
+    readable_props=frozenset(H14_DUAL_READABLE_PROPS),
+    alert_keys=frozenset({"dirty_tank_full"}),
+    prop_binaries=False,
+    button_keys=frozenset(),
+    status_labels={"": H14_DUAL_STATUS_EN, "uk": H14_DUAL_STATUS_UK},
+    work_mode_labels=False,
+    status_groups=STATUS_GROUP,
+    consumable_fallback=True,
+    prop_units={(1, 53): "min"},
 )
 
 H15_MIX = ModelProfile(
@@ -136,6 +164,7 @@ GENERIC = ModelProfile(
 
 PROFILES: dict[str, ModelProfile] = {
     H14_PRO_MODEL: H14_PRO,
+    H14_DUAL_MODEL: H14_DUAL,
     H15_MIX_MODEL: H15_MIX,
     H15_PRO_HEAT_MODEL: H15_PRO_HEAT,
     H15_PRO_HEAT_MODEL_ALT: H15_PRO_HEAT,

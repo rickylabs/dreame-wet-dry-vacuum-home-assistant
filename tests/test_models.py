@@ -1,4 +1,4 @@
-"""Model profiles and status names (H14 Pro, H15 Mix, H15 Pro Heat, unknown)."""
+"""Model profiles and status names (H14 Pro, H14 Dual, H15 Mix, H15 Pro Heat, unknown)."""
 import logging
 
 import pytest
@@ -6,6 +6,7 @@ from homeassistant.const import Platform
 
 from custom_components.dreame_wet_dry_vacuum.const import (
     DEVICE_STATUS,
+    H14_DUAL_MODEL,
     H14_PRO_MODEL,
     H15_MIX_MODEL,
     H15_PRO_HEAT_MODEL,
@@ -13,6 +14,7 @@ from custom_components.dreame_wet_dry_vacuum.const import (
 )
 from custom_components.dreame_wet_dry_vacuum.models import (
     GENERIC,
+    H14_DUAL,
     H14_PRO,
     H15_MIX,
     H15_PRO_HEAT,
@@ -34,6 +36,7 @@ class TestProfiles:
         ("model", "profile"),
         [
             (H14_PRO_MODEL, H14_PRO),
+            (H14_DUAL_MODEL, H14_DUAL),
             (H15_MIX_MODEL, H15_MIX),
             (H15_PRO_HEAT_MODEL, H15_PRO_HEAT),
             (H15_PRO_HEAT_MODEL_ALT, H15_PRO_HEAT),
@@ -59,6 +62,18 @@ class TestProfiles:
             Platform.BINARY_SENSOR,
             Platform.BUTTON,
         }
+
+    def test_h14_dual_reads_only(self):
+        # Only reading was checked on the H14 Dual: no command may reach it.
+        assert H14_DUAL.tested is True
+        assert set(H14_DUAL.platforms) == {Platform.SENSOR, Platform.BINARY_SENSOR}
+        assert H14_DUAL.button_keys == frozenset()
+        assert H14_DUAL.alert_keys == frozenset({"dirty_tank_full"})
+
+    def test_only_h14_dual_overrides_units(self):
+        assert H14_DUAL.prop_units == {(1, 53): "min"}
+        for profile in (H14_PRO, H15_MIX, H15_PRO_HEAT, GENERIC):
+            assert profile.prop_units == {}
 
     def test_untested_model_logged_once_without_account_data(self, caplog):
         caplog.set_level(logging.INFO)
@@ -88,6 +103,16 @@ class TestStatusNames:
     def test_h14_pro_uses_its_table(self):
         assert describe_status(H14_PRO, H14_PRO_MODEL, 7) == DEVICE_STATUS[7]
         assert status_group(H14_PRO, 4) == "charging"
+
+    def test_h14_dual_english_and_ukrainian(self):
+        assert describe_status(H14_DUAL, H14_DUAL_MODEL, 7, "en") == "Sleeping"
+        assert describe_status(H14_DUAL, H14_DUAL_MODEL, 7, "uk") == "Режим сну"
+        # Dreame's own Ukrainian table says "Disconnesso" for 2.
+        assert describe_status(H14_DUAL, H14_DUAL_MODEL, 2, "uk") == "Офлайн"
+        assert describe_status(H14_DUAL, H14_DUAL_MODEL, 29, "fr") == "Vacuuming paused"
+        assert status_group(H14_DUAL, 4) == "charging"
+        assert status_group(H14_DUAL, 27) == "self_cleaning"
+        assert status_group(H14_DUAL, 24) == "drying"
 
     def test_h15_mix_english_and_german(self):
         assert describe_status(H15_MIX, H15_MIX_MODEL, 26, "en") == "Hot-water self-cleaning"
